@@ -1,0 +1,3 @@
+[submodule "D:\\Development\\C++\\Maths\\Mandelbrot\\vendor\\UITools"]
+	path = D:\\Development\\C++\\Maths\\Mandelbrot\\vendor\\UITools
+	url = https://github.com/NullSeile/UITools.git
