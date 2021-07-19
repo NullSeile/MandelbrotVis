@@ -75,17 +75,8 @@ vec3 get_color(int i)
 	sf::Font font;
 	font.loadFromFile("rsc/Consolas.ttf");
 
-	//graph.SetCenter({ -0.137, 0.77 });
-	//graph.SetZoom(1);
-
-	//graph.MakeScreenShot("out1.png");
-
-	//graph.SetZoom(.15);
-
-	//graph.MakeScreenShot("out2.png");
-
-	//graph.SetCenter({ -0.5, 0 });
-	//graph.SetZoom(1.2);
+	graph.SetCenter({ -0.5, 0 });
+	graph.SetZoom(1.1);
 
 	//graph.SetCenter({ 0.270925, 0.004725 });
 	//graph.SetZoom(0.0001);
@@ -114,11 +105,11 @@ vec3 get_color(int i)
 	//graph.SetCenter({ -0.7461860152692163517, 0.095926522548036297078 });
 	//graph.SetZoom(0.0035131274618377607462);
 
-	graph.SetCenter({ -0.74656412896776469523, 0.098865810107694587772 });
-	graph.SetZoom(8.2212188006580699331e-12);
+	//graph.SetCenter({ -0.74656412896776469523, 0.098865810107694587772 });
+	//graph.SetZoom(8.2212188006580699331e-12);
 
 	ui::Vec2u toolsSize = { 600, 300 };
-	sf::RenderWindow toolsWindow({ toolsSize.x, toolsSize.y }, "Tools :)", sf::Style::Titlebar);
+	sf::RenderWindow toolsWindow({ toolsSize.x, toolsSize.y }, "Tools :)", sf::Style::Close);
 
 
 	ui::Widget widget;
