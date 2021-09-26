@@ -7,12 +7,12 @@
 int main()
 {
 	sf::ContextSettings settings;
-	settings.antialiasingLevel = 16;
+	settings.antialiasingLevel = 8;
 
 	ui::Vec2u windowSize = { 900, 900 };
 
 	sf::RenderWindow window({ windowSize.x, windowSize.y }, "Graph", sf::Style::Default, settings);
-	window.setFramerateLimit(60);
+	window.setFramerateLimit(120);
 
 	std::vector<ColorFunction> colors;
 
@@ -63,50 +63,61 @@ vec3 get_color(int i)
 }
 	)").AddUniform("colorMult", { 1, 1000 }, 200));
 
+	colors.push_back(ColorFunction(R"(
+vec3 get_color(int i)
+{
+    float x = i / colorMult;
+    float n1 = sin(x) * 0.5 + 0.5;
+    float n2 = cos(x) * 0.5 + 0.5;
+    return vec3(n1, n2, 1.0) * 1;
+}
+	)").AddUniform("colorMult", { 1, 300 }, 200));
+
 
 	size_t currentColorIndex = 0;
 
 	MandelbrotGraph graph(colors[currentColorIndex]);
 	graph.SetPosition({ 0, 0 });
 	graph.SetSize(windowSize);
-	graph.SetMaxIters(10000);
-	graph.SetResolutionScale(2.f);
+	graph.SetMaxIters(1500);
 
 	sf::Font font;
 	font.loadFromFile("rsc/Consolas.ttf");
 
-	graph.SetCenter({ -0.5, 0 });
-	graph.SetZoom(1.1);
+	{
+		graph.SetCenter({ -0.5, 0 });
+		graph.SetRadius(1.1);
 
-	//graph.SetCenter({ 0.270925, 0.004725 });
-	//graph.SetZoom(0.0001);
+		//graph.SetCenter({ 0.270925, 0.004725 });
+		//graph.SetRadius(0.0001);
 
-	//graph.SetCenter({ -0.745428, 0.113009 });
-	//graph.SetZoom(3.0e-5);
+		//graph.SetCenter({ -0.745428, 0.113009 });
+		//graph.SetRadius(3.0e-5);
 
-	//graph.SetCenter({ -1.25223118015508028122, 0.03755885941558481655 });
-	//graph.SetZoom(3.6e-8);
+		//graph.SetCenter({ -1.25223118015508028122, 0.03755885941558481655 });
+		//graph.SetRadius(3.6e-8);
 
-	//graph.SetCenter({ -1.2519620871808931906, 0.037393550920969360896 });
-	//graph.SetZoom(1.45e-08);
+		//graph.SetCenter({ -1.2519620871808931906, 0.037393550920969360896 });
+		//graph.SetRadius(1.45e-08);
 
-	//graph.SetCenter({-0.747747, 0.124517});
-	//graph.SetZoom(1.0e-4);
+		//graph.SetCenter({-0.747747, 0.124517});
+		//graph.SetRadius(1.0e-4);
 
-	//graph.SetCenter({ -1.25066, 0.02012 });
-	//graph.SetZoom(1.7e-4);
+		//graph.SetCenter({ -1.25066, 0.02012 });
+		//graph.SetRadius(1.7e-4);
 
-	//graph.SetCenter({ -0.748, 0.1 });
-	//graph.SetZoom(0.0014);
+		//graph.SetCenter({ -0.748, 0.1 });
+		//graph.SetRadius(0.0014);
 
-	//graph.SetCenter({ -0.514814, 0.6111110539 });
-	//graph.SetZoom(0.1);
+		//graph.SetCenter({ -0.514814, 0.6111110539 });
+		//graph.SetRadius(0.1);
 
-	//graph.SetCenter({ -0.7461860152692163517, 0.095926522548036297078 });
-	//graph.SetZoom(0.0035131274618377607462);
+		//graph.SetCenter({ -0.7461860152692163517, 0.095926522548036297078 });
+		//graph.SetRadius(0.0035131274618377607462);
 
-	//graph.SetCenter({ -0.74656412896776469523, 0.098865810107694587772 });
-	//graph.SetZoom(8.2212188006580699331e-12);
+		//graph.SetCenter({ -0.74656412896776469523, 0.098865810107694587772 });
+		//graph.SetRadius(8.2212188006580699331e-12);
+	}
 
 	ui::Vec2u toolsSize = { 600, 300 };
 	sf::RenderWindow toolsWindow({ toolsSize.x, toolsSize.y }, "Tools :)", sf::Style::Close);
@@ -137,12 +148,12 @@ vec3 get_color(int i)
 			text.setScale(0.7f, 0.7f);
 
 			slider->SetReleasedFunction([&u, &graph](ui::UIObject* obj)
-				{
-					auto self = dynamic_cast<ui::Slider*>(obj);
-					float val = self->GetValue();
-					graph.SetUniform(u.name, val);
-					u.default_val = val;
-				});
+			{
+				auto self = dynamic_cast<ui::Slider*>(obj);
+				float val = self->GetValue();
+				graph.SetUniform(u.name, val);
+				u.default_val = val;
+			});
 
 			widget.AddObject(slider);
 			i++;
@@ -213,6 +224,7 @@ void main()
 
 	UpdateSliders();
 
+	sf::Clock c;
 
 	while (window.isOpen())
 	{
@@ -242,7 +254,7 @@ void main()
 				{
 					auto [xRange, yRange] = graph.GetRange();
 
-					std::cout << std::setprecision(20) << "Center: " << graph.GetCenter() << " Radius: " << graph.GetZoom() << '\n';
+					std::cout << std::setprecision(20) << "Center: " << graph.GetCenter() << " Radius: " << graph.GetRadius() << '\n';
 				}
 				if (e.key.code == sf::Keyboard::Return)
 				{
@@ -251,40 +263,14 @@ void main()
 					std::cin >> maxIters;
 					graph.SetMaxIters(maxIters);
 				}
-				if (e.key.code == sf::Keyboard::R)
+				if (e.key.code == sf::Keyboard::C)
 				{
-					std::cout << "Resolution scale: ";
-					float resolutionScale;
-					std::cin >> resolutionScale;
-
-					graph.SetResolutionScale(resolutionScale);
-				}
-				if (e.key.code == sf::Keyboard::P)
-				{
-					std::cout << "\nMake a screenshot\n";
-					std::cout << "Resolution scale: ";
-					float resolutionScale;
-					std::cin >> resolutionScale;
-
-					std::cout << "Max iters: ";
-					int maxIters;
-					std::cin >> maxIters;
-
-					std::cout << "Creating Screenshot...\n";
-
-					graph.MakeScreenShot("out.png", resolutionScale, maxIters);
-
-					std::cout << "Done!\n";
-				}
-				if (e.key.code == sf::Keyboard::A)
-				{
-					std::cout << "Antialiasing level: ";
-					int antialiasingLevel;
-					std::cin >> antialiasingLevel;
-					graph.SetAntialiasingLevel(antialiasingLevel);
+					graph.SetCenter({ 0, 0 });
 				}
 			}
 		}
+
+		graph.Update(window);
 
 		while (toolsWindow.pollEvent(e))
 		{
@@ -298,9 +284,8 @@ void main()
 
 		toolsWindow.display();
 
+		
 		window.clear();
-
-		graph.Update(window);
 		graph.Draw(window);
 
 		window.display();

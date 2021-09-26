@@ -54,14 +54,10 @@ public:
 class MandelbrotGraph
 {
 private:
-	ui::Vec2d m_startPos;
-	double m_zoom;
 	ui::Vec2d m_center;
-	ui::Vec2d m_view;
-	bool m_mousePressed;
-	double m_aspect;
-
-	void UpdateView();
+	double m_radius;
+	int m_frame;
+	int m_maxIters;
 
 	ui::Vec2d m_xRange;
 	ui::Vec2d m_yRange;
@@ -70,22 +66,15 @@ private:
 	ui::Vec2u m_size;
 
 	sf::Shader m_shader;
-	sf::RenderTexture m_target;
-	sf::Sprite m_spr;
-
-	ui::Vec2d m_imgPos;
-	ui::Vec2d m_imgEndPos;
-
-	bool dirty = true;
-
 	std::string m_coreShader;
+	sf::RenderTexture m_target;
+	sf::RectangleShape m_shape;
 
-	int m_maxIters;
-	float m_resolutionScale;
+	bool m_mousePressed;
+	ui::Vec2d m_startPos;
 
-	int m_antialiasingLevel = 0;
-
-	void Recalculate();
+	void Resize();
+	void UpdateRange();
 
 public:
 	MandelbrotGraph();
@@ -93,33 +82,23 @@ public:
 
 	void Update(const sf::RenderWindow& window);
 	void CheckInput(const sf::RenderWindow& window, ui::Event& e);
-	void SetZoom(const double& zoom);
+	void Draw(sf::RenderWindow& window);
 
+	void SetRadius(double radius);
 	void SetPosition(const ui::Vec2d& pos);
 	void SetSize(const ui::Vec2u& size);
 	void SetMaxIters(int maxIters);
-
-	ui::Vec2d MapPosToCoords(const ui::Vec2d& pos);
-	ui::Vec2d MapCoordsToPos(const ui::Vec2d& coords);
-
 	void SetCenter(const ui::Vec2d& center);
-
-	void Draw(sf::RenderWindow& window);
+	void SetColorFunc(const ColorFunction& colorFunc);
 
 	std::pair<ui::Vec2d, ui::Vec2d> GetRange();
 	ui::Vec2d GetCenter();
-	double GetZoom();
-
-	void SetColorFunc(const ColorFunction& colorFunc);
-
-	void SetResolutionScale(float resolutionScale);
-
-	void MakeScreenShot(const std::string& fileName, float resolutionScale, int maxIterations);
-	void MakeScreenShot(const std::string& fileName);
+	double GetRadius();
 
 	void SetUniform(const std::string& name, float val);
 	float GetUniform(const std::string& name);
 
-	void SetAntialiasingLevel(int antialiasingLevel);
+	ui::Vec2d MapPosToCoords(const ui::Vec2d& pos);
+	ui::Vec2d MapCoordsToPos(const ui::Vec2d& coords);
 };
 

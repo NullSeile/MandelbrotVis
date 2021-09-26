@@ -1,22 +1,30 @@
-//#version 400
+//#version 450 core
 
 uniform uvec2 size;
-uniform dvec2 xRange;
+uniform highp dvec2 xRange;
 uniform dvec2 yRange;
 uniform int maxIters;
+uniform int frame;
 
 out vec4 outColor;
 
 double map(double value, double inputMin, double inputMax, double outputMin, double outputMax)
 {
-	return outputMin + ((outputMax - outputMin) / (inputMax - inputMin)) * (value - inputMin);
+    return outputMin + ((outputMax - outputMin) / (inputMax - inputMin)) * (value - inputMin);
+}
+
+double rand(float s) {
+    return fract(sin(s * 12.9898) * 43758.5453);
 }
 
 int get_iterations()
 {
-    double x0 = map(gl_FragCoord.x, 0, size.x, xRange.x, xRange.y);
-    double y0 = map(gl_FragCoord.y, 0, size.y, yRange.y, yRange.x);
- 
+    dvec2 screen_pos = gl_FragCoord.xy;
+    dvec2 pos = screen_pos + dvec2(rand(frame), rand(frame));
+
+    double x0 = map(pos.x, 0, size.x, xRange.x, xRange.y);
+    double y0 = map(pos.y, 0, size.y, yRange.x, yRange.y);
+
     double x = 0;
     double y = 0;
     double x2 = 0;
@@ -33,38 +41,20 @@ int get_iterations()
     return i;
 }
 
-#define product(a, b) dvec2(a.x*b.x-a.y*b.y, a.x*b.y+a.y*b.x)
-
-int get_iterations_2()
-{
-    double x0 = map(gl_FragCoord.x, 0, size.x, xRange.x, xRange.y);
-    double y0 = map(gl_FragCoord.y, 0, size.y, yRange.y, yRange.x);
-
-    dvec2 c = dvec2(x0, y0);
-    dvec2 z = dvec2(0, 0);
-
-    int i;
-    for (i = 0; i < maxIters && z.x*z.x + z.y*z.y <= 4; i++)
-    {
-        z = product(z, z) + c;
-    }
-    return i;
-}
-
-
 vec4 return_value()
 {
     int iter = get_iterations();
     if (iter == maxIters)
     {
         gl_FragDepth = 0.0f;
-        return vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        return vec4(0.0f, 0.0f, 0.0f, 0.0f);
     }
- 
-    return vec4(get_color(iter).xyz, 1.0f);
+
+    return vec4(get_color(iter).xyz, 1.0 / (frame + 1.0));
 }
- 
+
 void main()
 {
-    outColor = return_value();
+    if (frame < 100)
+        outColor = return_value();
 }

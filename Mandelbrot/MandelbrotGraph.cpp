@@ -4,43 +4,22 @@
 #include <fstream>
 #include <streambuf>
 
-void MandelbrotGraph::Recalculate()
-{
-	m_imgPos = MapCoordsToPos({ 0, 0 });
-	m_imgEndPos = MapCoordsToPos((ui::Vec2f)m_size / m_resolutionScale);
+static const sf::BlendMode BlendAlpha(sf::BlendMode::SrcAlpha, sf::BlendMode::OneMinusSrcAlpha, sf::BlendMode::Add,
+	sf::BlendMode::Zero, sf::BlendMode::One, sf::BlendMode::Add);
+static const sf::BlendMode BlendIgnoreAlpha(sf::BlendMode::One, sf::BlendMode::Zero, sf::BlendMode::Add,
+	sf::BlendMode::Zero, sf::BlendMode::One, sf::BlendMode::Add);
 
-	uint shader_handle = m_shader.getNativeHandle();
-	glUseProgram(shader_handle);
-
-	GLint size_loc = glGetUniformLocation(shader_handle, "size");
-	GLint xRange_loc = glGetUniformLocation(shader_handle, "xRange");
-	GLint yRange_loc = glGetUniformLocation(shader_handle, "yRange");
-
-	glUniform2ui(size_loc, (uint)(m_size.x * m_resolutionScale), (uint)(m_size.y * m_resolutionScale));
-	glUniform2d(xRange_loc, m_xRange.min, m_xRange.max);
-	glUniform2d(yRange_loc, m_yRange.min, m_yRange.max);
-	m_shader.setUniform("maxIters", m_maxIters);
-
-	m_target.create((uint)(m_size.x * m_resolutionScale), (uint)(m_size.y * m_resolutionScale));
-
-	sf::RectangleShape shape((ui::Vec2f)m_size * m_resolutionScale);
-	m_target.draw(shape, &m_shader);
-	m_target.generateMipmap();
-
-	m_spr = sf::Sprite(m_target.getTexture());
-}
 
 MandelbrotGraph::MandelbrotGraph()
 	: m_pos(0, 0)
 	, m_size(100, 100)
-	, m_zoom(2)
+	, m_radius(2)
 	, m_center(0, 0)
-	, m_view(-m_zoom, m_zoom)
 	, m_mousePressed(false)
-	, m_aspect(1)
 	, m_maxIters(2048)
-	, m_resolutionScale(1)
 {
+	printf("OpenGL version supported by this platform (%s): \n", glGetString(GL_VERSION));
+
 	std::ifstream file("rsc/mandelbrot.frag");
 	m_coreShader = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
@@ -50,13 +29,10 @@ MandelbrotGraph::MandelbrotGraph()
 MandelbrotGraph::MandelbrotGraph(const ColorFunction& colorFunc)
 	: m_pos(0, 0)
 	, m_size(100, 100)
-	, m_zoom(2)
+	, m_radius(2)
 	, m_center(0, 0)
-	, m_view(-m_zoom, m_zoom)
 	, m_mousePressed(false)
-	, m_aspect(1)
 	, m_maxIters(2048)
-	, m_resolutionScale(1)
 {
 	printf("OpenGL version supported by this platform (%s): \n", glGetString(GL_VERSION));
 
@@ -66,44 +42,33 @@ MandelbrotGraph::MandelbrotGraph(const ColorFunction& colorFunc)
 	SetColorFunc(colorFunc);
 }
 
+void MandelbrotGraph::Resize()
+{
+
+}
+
+void MandelbrotGraph::UpdateRange()
+{
+	double aspect = (double)m_size.x / (double)m_size.y;
+
+	m_yRange = { m_center.y - m_radius, m_center.y + m_radius };
+	m_xRange = { m_center.x - aspect * m_radius, m_center.x + aspect * m_radius };
+
+	uint shader_handle = m_shader.getNativeHandle();
+	glUseProgram(shader_handle);
+
+	GLint xRange_loc = glGetUniformLocation(shader_handle, "xRange");
+	GLint yRange_loc = glGetUniformLocation(shader_handle, "yRange");
+
+	glUniform2d(xRange_loc, m_xRange.x, m_xRange.y);
+	glUniform2d(yRange_loc, m_yRange.x, m_yRange.y);
+
+	m_frame = 0;
+}
+
 std::pair<ui::Vec2d, ui::Vec2d> MandelbrotGraph::GetRange()
 {
 	return { m_xRange, m_yRange };
-}
-
-void MandelbrotGraph::SetResolutionScale(float resolutionScale)
-{
-	m_resolutionScale = resolutionScale;
-	Recalculate();
-}
-
-void MandelbrotGraph::MakeScreenShot(const std::string& fileName, float resolutionScale, int maxIterations)
-{
-	float prevResScale = m_resolutionScale;
-	int prevMaxIters = m_maxIters;
-
-	m_resolutionScale = resolutionScale;
-	m_maxIters = maxIterations;
-
-	Recalculate();
-
-	m_target.getTexture().copyToImage().saveToFile(fileName);
-
-	m_resolutionScale = prevResScale;
-	m_maxIters = prevMaxIters;
-
-	Recalculate();
-}
-
-void MandelbrotGraph::SetAntialiasingLevel(int antialiasingLevel)
-{
-	m_antialiasingLevel = antialiasingLevel;
-	Recalculate();
-}
-
-void MandelbrotGraph::MakeScreenShot(const std::string& fileName)
-{
-	MakeScreenShot(fileName, m_resolutionScale, m_maxIters);
 }
 
 ui::Vec2d MandelbrotGraph::MapPosToCoords(const ui::Vec2d& pos)
@@ -127,34 +92,32 @@ ui::Vec2d MandelbrotGraph::MapCoordsToPos(const ui::Vec2d& coords)
 void MandelbrotGraph::SetPosition(const ui::Vec2d& pos)
 {
 	m_pos = pos;
+	m_shape.setPosition((ui::Vec2f)pos);
 }
 
 void MandelbrotGraph::SetSize(const ui::Vec2u& size)
 {
 	m_size = size;
 
-	UpdateView();
+	m_target.create(m_size.x, m_size.y);
+	m_frame = 0;
 
-	dirty = true;
+	m_shape.setSize((ui::Vec2f)m_size);
 
-	Recalculate();
+	uint shader_handle = m_shader.getNativeHandle();
+	glUseProgram(shader_handle);
+
+	GLint size_loc = glGetUniformLocation(shader_handle, "size");
+	glUniform2ui(size_loc, m_size.x, m_size.y);
+
+	UpdateRange();
 }
 
 void MandelbrotGraph::SetMaxIters(int maxIters)
 {
 	m_maxIters = maxIters;
-
-	Recalculate();
-}
-
-void MandelbrotGraph::UpdateView()
-{
-	m_view = { -m_zoom, m_zoom };
-
-	m_aspect = m_size.x / (double)m_size.y;
-
-	m_xRange = ui::Vec2d(m_center.x, m_center.x) + m_view * m_aspect;
-	m_yRange = ui::Vec2d(m_center.y, m_center.y) + m_view;
+	m_shader.setUniform("maxIters", m_maxIters);
+	m_frame = 0;
 }
 
 void MandelbrotGraph::Update(const sf::RenderWindow& window)
@@ -168,38 +131,32 @@ void MandelbrotGraph::Update(const sf::RenderWindow& window)
 
 		m_startPos = (ui::Vec2d)sf::Mouse::getPosition(window);
 
-		UpdateView();
+		UpdateRange();
+
+		m_frame = 0;
 	}
 }
 
 void MandelbrotGraph::CheckInput(const sf::RenderWindow& window, ui::Event& e)
 {
-	if (e.type == sf::Event::MouseWheelMoved && m_mousePressed)
+	if (e.type == sf::Event::MouseWheelMoved)
 	{
-		switch (e.mouseWheel.delta)
-		{
-		case 1:
-			m_zoom /= 1.2f;
-			break;
-
-		case -1:
-			m_zoom *= 1.2f;
-			break;
-
-		default:
-			break;
-		}
+		m_radius /= std::pow(1.1f, e.mouseWheel.delta);
 
 		// Zoom where the mouse is
 		ui::Vec2d iMousePos = MapCoordsToPos((ui::Vec2d)sf::Mouse::getPosition(window));
 
-		UpdateView();
+		UpdateRange();
 
 		ui::Vec2d fMousePos = MapCoordsToPos((ui::Vec2d)sf::Mouse::getPosition(window));
-		
+
 		ui::Vec2d delta = fMousePos - iMousePos;
 
 		m_center -= delta;
+
+		UpdateRange();
+
+		m_frame = 0;
 	}
 
 	if (e.type == sf::Event::MouseButtonPressed && e.key.code == sf::Mouse::Left && !e.handled)
@@ -211,39 +168,41 @@ void MandelbrotGraph::CheckInput(const sf::RenderWindow& window, ui::Event& e)
 	if (e.type == sf::Event::MouseButtonReleased && e.key.code == sf::Mouse::Left)
 	{
 		m_mousePressed = false;
-		Recalculate();
+		m_frame = 0;
 	}
 }
 
-void MandelbrotGraph::SetZoom(const double& zoom)
+void MandelbrotGraph::SetRadius(double radius)
 {
-	m_zoom = zoom;
-
-	UpdateView();
-
-	Recalculate();
+	m_radius = radius;
+	UpdateRange();
 }
 
 void MandelbrotGraph::SetCenter(const ui::Vec2d& center)
 {
 	m_center = center;
-
-	UpdateView();
-
-	Recalculate();
+	UpdateRange();
 }
 
 void MandelbrotGraph::Draw(sf::RenderWindow& window)
 {
-	ui::Vec2d p = MapPosToCoords(m_imgPos);
-	ui::Vec2d f = MapPosToCoords(m_imgEndPos);
+	m_shader.setUniform("frame", m_frame);
 
-	double scale = (f.x - p.x) / m_size.x;
+	sf::RenderStates states = sf::RenderStates::Default;
+	states.blendMode = (m_frame > 0 ? BlendAlpha : BlendIgnoreAlpha);
+	states.shader = &m_shader;
 
-	m_spr.setPosition((ui::Vec2f)p);
-	m_spr.setScale((float)scale, (float)scale);
+	m_shape.setSize(sf::Vector2f((double)m_size.x, (double)m_size.y));
+	m_shape.setFillColor(sf::Color::Magenta);
 
-	window.draw(m_spr);
+	m_target.draw(m_shape, states);
+	m_target.display();
+
+	sf::Sprite sprite(m_target.getTexture());
+	window.clear();
+	window.draw(sprite, sf::RenderStates(BlendIgnoreAlpha));
+
+	m_frame += 1;
 }
 
 ui::Vec2d MandelbrotGraph::GetCenter()
@@ -251,9 +210,9 @@ ui::Vec2d MandelbrotGraph::GetCenter()
 	return m_center;
 }
 
-double MandelbrotGraph::GetZoom()
+double MandelbrotGraph::GetRadius()
 {
-	return m_zoom;
+	return m_radius;
 }
 
 void MandelbrotGraph::SetColorFunc(const ColorFunction& colorFunc)
@@ -276,14 +235,18 @@ void MandelbrotGraph::SetColorFunc(const ColorFunction& colorFunc)
 		SetUniform(u.name, u.default_val);
 	}
 
-	Recalculate();
+	// Set default uniforms
+	SetSize(m_size);
+	SetMaxIters(m_maxIters);
+
+	m_frame = 0;
 }
 
 void MandelbrotGraph::SetUniform(const std::string& name, float val)
 {
 	m_shader.setUniform(name, val);
 
-	Recalculate();
+	m_frame = 0;
 }
 
 float MandelbrotGraph::GetUniform(const std::string& name)
